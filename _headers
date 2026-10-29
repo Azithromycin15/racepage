@@ -11,7 +11,7 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
-/report
+/tpems-report
   Cache-Control: public, max-age=0, must-revalidate
 
 /*.html

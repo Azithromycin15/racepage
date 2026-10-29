@@ -2,5 +2,10 @@
 /three-phase-energy-metering.html / 301
 /three-phase-energy-metering / 301
 
+# 报告页更名：旧地址 301 到新地址
+/report.html /tpems-report 301
+/report /tpems-report 301
+/report/ /tpems-report 301
+
 # 统一使用目录首页，避免 /index.html 与 / 重复
 /index.html / 301

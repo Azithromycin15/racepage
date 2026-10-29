@@ -32,7 +32,7 @@
       <a href="#overview">概览</a>
       <a href="#results">结果</a>
       <a href="#downloads">下载</a>
-      <a href="report.html">完整报告</a>
+      <a href="tpems-report.html">完整报告</a>
     </nav>
   </div>
 </header>
@@ -47,7 +47,7 @@
 
     <div class="hero-actions">
       <a class="btn btn-primary" href="#downloads">下载资料 <span aria-hidden="true">↓</span></a>
-      <a class="btn btn-ghost" href="report.html">阅读完整报告 <span aria-hidden="true">→</span></a>
+      <a class="btn btn-ghost" href="tpems-report.html">阅读完整报告 <span aria-hidden="true">→</span></a>
     </div>
 
     <div class="hero-stats" id="hero-stats" aria-label="资料统计">
@@ -70,7 +70,7 @@
         <p class="abstract-label">摘要 <span lang="en">Abstract</span></p>
         <p>本文设计并实现了一套基于 ARM 微控制器的三相电能计量系统，目标是在便携、低成本的单芯片架构下完成稳态电能质量参数的采集与计算。系统由电压/电流互感器、信号调理与二阶抗混叠低通滤波、16 位 8 通道 ADC ADS8688 和 STM32F407ZGT6 组成；以 10.24 kHz 定时触发采样，每帧 1024 点，在 Cortex-M4 上完成 FFT 以及有效值、功率、功率因数、频率、谐波畸变率和三相不平衡度计算，结果经 TFT LCD 实时显示。以 Tektronix PA1000 为参考，在单相工频回路上对 6 组工况进行比对：电压读数最大相对偏差 0.46%，电流最大相对偏差 7.23%，功率因数最大绝对偏差 0.06；三档谐波畸变率的偏差不超过 0.23 个百分点，频率读数与基准一致；平衡负载下不平衡度读数为 0.00%，不平衡负载下可检出电压与电流不平衡度的变化。结果表明，单芯片方案能够完成稳态参数的测量；电流通道的系统偏差、低 Q 值抗混叠滤波器对高次谐波的衰减，以及基于峰值谱线的频率估计，构成当前实现的主要误差来源与适用边界。</p>
         <p class="keywords"><b>关键词</b>电能质量；三相电能计量；ARM；快速傅里叶变换；谐波畸变率；三相不平衡度</p>
-        <a class="text-link" href="report.html">阅读完整报告 <span aria-hidden="true">→</span></a>
+        <a class="text-link" href="tpems-report.html">阅读完整报告 <span aria-hidden="true">→</span></a>
       </div>
 
       <aside class="project-card" aria-label="项目档案">
@@ -186,7 +186,7 @@
         <p>在线阅读全部章节，或直接下载设计论文 PDF。</p>
       </div>
       <div class="cta-actions">
-        <a class="btn btn-primary" href="report.html">在线阅读 <span aria-hidden="true">→</span></a>
+        <a class="btn btn-primary" href="tpems-report.html">在线阅读 <span aria-hidden="true">→</span></a>
         <a class="btn btn-ghost" href="assets/files/thesis.pdf" download="三相电能计量系统设计-毕业设计论文.pdf">下载论文 <span aria-hidden="true">↓</span></a>
       </div>
     </div>
