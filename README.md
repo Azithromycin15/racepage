@@ -13,6 +13,7 @@
 .
 ├── index.html              # 资料首页：概览、关键结果、下载目录
 ├── report.html             # 完整研究报告（Pages 的 clean URL 通常为 /report）
+├── favicon.ico             # 16/32/48/64/128/256 六尺寸 ICO（根目录约定）
 ├── 404.html                # Cloudflare Pages 自定义 404
 ├── _headers                # 安全响应头与缓存策略
 ├── _redirects              # 旧地址 301 到首页
@@ -25,7 +26,8 @@
 │   ├── catalog.js          # 首页卡片渲染器
 │   └── report.js           # 报告页目录高亮与返回顶部
 └── assets/
-    ├── favicon.svg
+    ├── favicon.svg         # 矢量图标（与 ICO 同款三相互感波形）
+    ├── apple-touch-icon.png # 180×180 不透明 Apple Touch Icon
     ├── files/              # 8 份 PDF（ASCII 路径）
     └── img/                # 12 张实测/硬件照片
         └── thumbs/         # 首页卡片用的 160×160 缩略图
@@ -106,6 +108,7 @@ node --check heads/report.js
 - 报告页的公式、表格、SVG 图表、图片与目录高亮均保持原实现；新增的仅是顶部/页脚的返回入口。
 - 响应式断点：900 px（概览与指标）、720 px（导航与卡片）、480 px（小屏）。
 - 支持 `prefers-reduced-motion`；报告页保留打印样式。
+- 图标统一为「深色圆角底 + 三相波形」：`favicon.svg` 是矢量版，`favicon.ico` 内含 16/32/48/64/128/256 六种尺寸，`apple-touch-icon.png` 为不透明 180×180 版本。
 - 默认通过 `X-Frame-Options: SAMEORIGIN` 与 CSP 的 `frame-ancestors 'self'` 限制为同源嵌入。如需被第三方页面 iframe 嵌入，删除 `_headers` 中这两项即可。
 
 ## 与 webdir 的关系
