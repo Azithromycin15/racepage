@@ -552,3 +552,10 @@ footer.site a:hover{border-bottom-color:currentColor}
 
 /* 移动端标题：把“三相电能计量系统设计”作为整体换行 */
 .title-keep{white-space:nowrap}
+
+/* 打印为项目设计报告时去掉站内导航链接 */
+@media print{
+  .kicker .right a,
+  .kicker .kicker-sep,
+  footer.site .right p:last-child{display:none}
+}

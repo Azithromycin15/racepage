@@ -1,5 +1,5 @@
 /* ============================================================
- * 三相电能计量系统 · 资料清单（本地静态数据）
+ * 三相电能计量系统 · 项目资料清单（本地静态数据）
  *
  * 页面不请求任何外部接口；catalog.js 读取本文件后渲染卡片。
  * 字段说明：
@@ -8,13 +8,13 @@
  *   items[]        下载条目
  *     title        展示标题
  *     desc         说明文字
- *     file         原始文件名（展示用）
- *     url          站内相对路径（ASCII，避免 URL 编码问题）
+ *     file         下载文件名（展示用）
+ *     url          站内相对路径（ASCII）
  *     icon         图标类型：pdf / img / file
  *     kind         文件类型标签：PDF / JPG
  *     pages        PDF 页数（可选）
  *     bytes        字节数（用于统计与大小格式化）
- *     downloadName 下载时保存的文件名（保留中文原名）
+ *     downloadName 下载时保存的文件名
  *     thumb        图片缩略图路径（可选）
  * ============================================================ */
 
@@ -24,110 +24,25 @@ window.METERING_DATA = {
         {
             "id": "documents",
             "no": "3.1",
-            "title": "设计文档",
-            "desc": "设计报告、过程材料与答辩稿",
+            "title": "项目文档",
+            "desc": "项目设计报告",
             "items": [
                 {
-                    "title": "毕业设计论文",
-                    "desc": "系统设计、实现、测试与误差分析的完整报告（第 1–5 章）。",
-                    "file": "三相电能计量系统设计-毕业设计论文.pdf",
-                    "url": "assets/files/thesis.pdf",
+                    "title": "项目设计报告",
+                    "desc": "系统设计、实现、测试与误差分析的完整报告。",
+                    "file": "项目设计报告.pdf",
+                    "url": "assets/files/design-report.pdf",
                     "icon": "pdf",
                     "kind": "PDF",
-                    "pages": 39,
-                    "bytes": 1836669,
-                    "downloadName": "三相电能计量系统设计-毕业设计论文.pdf"
-                },
-                {
-                    "title": "毕业设计材料册",
-                    "desc": "任务书、开题报告、中期检查等过程材料汇编。",
-                    "file": "毕业设计材料册.pdf",
-                    "url": "assets/files/materials.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 9,
-                    "bytes": 459609,
-                    "downloadName": "毕业设计材料册.pdf"
-                },
-                {
-                    "title": "答辩逐字稿",
-                    "desc": "答辩演示讲稿与问答准备，配合图表逐页展开。",
-                    "file": "答辩逐字稿.pdf",
-                    "url": "assets/files/defense-script.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 1,
-                    "bytes": 188262,
-                    "downloadName": "答辩逐字稿.pdf"
-                }
-            ]
-        },
-        {
-            "id": "references",
-            "no": "3.2",
-            "title": "参考文献",
-            "desc": "引用文献与延伸阅读全文",
-            "items": [
-                {
-                    "title": "基于 ARM 的电能质量检测装置硬件系统设计与实现",
-                    "desc": "汶瑞建 · 硬件系统设计 · 延伸阅读",
-                    "file": "ref-01-汶瑞建-基于ARM的电能质量检测装置硬件系统设计与实现.pdf",
-                    "url": "assets/files/ref-01-wen-ruijian-arm-hardware.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 93,
-                    "bytes": 18849727,
-                    "downloadName": "ref-01-汶瑞建-基于ARM的电能质量检测装置硬件系统设计与实现.pdf"
-                },
-                {
-                    "title": "基于 ARM 的电能质量监测仪系统软件的设计与实现",
-                    "desc": "栾小飞 · 系统软件设计 · 延伸阅读",
-                    "file": "ref-02-栾小飞-基于ARM的电能质量监测仪系统软件的设计与实现.pdf",
-                    "url": "assets/files/ref-02-luan-xiaofei-arm-software.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 85,
-                    "bytes": 10179079,
-                    "downloadName": "ref-02-栾小飞-基于ARM的电能质量监测仪系统软件的设计与实现.pdf"
-                },
-                {
-                    "title": "基于 FPGA+ARM 的电能质量分析仪研究与设计",
-                    "desc": "李鹏飞 · 北方工业大学, 2023 · 参考文献 [3]",
-                    "file": "ref-03-李鹏飞-基于FPGA+ARM的电能质量分析仪研究与设计.pdf",
-                    "url": "assets/files/ref-03-li-pengfei-fpga-arm.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 67,
-                    "bytes": 4494129,
-                    "downloadName": "ref-03-李鹏飞-基于FPGA+ARM的电能质量分析仪研究与设计.pdf"
-                },
-                {
-                    "title": "基于 DSP+ARM 的便携式电能质量分析仪的设计",
-                    "desc": "于军, 朱凌云 · 计算机测量与控制, 2015 · 参考文献 [17]",
-                    "file": "ref-04-于军-基于DSP+ARM的电能质量分析仪的研究与设计.pdf",
-                    "url": "assets/files/ref-04-yu-jun-dsp-arm.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 100,
-                    "bytes": 5274812,
-                    "downloadName": "ref-04-于军-基于DSP+ARM的电能质量分析仪的研究与设计.pdf"
-                },
-                {
-                    "title": "基于 DSP+CPLD 的电能质量分析仪的研制",
-                    "desc": "龚建峰 · 延伸阅读",
-                    "file": "ref-05-龚建峰-基于DSP+CPLD的电能质量分析仪的研制.pdf",
-                    "url": "assets/files/ref-05-gong-jianfeng-dsp-cpld.pdf",
-                    "icon": "pdf",
-                    "kind": "PDF",
-                    "pages": 69,
-                    "bytes": 4244694,
-                    "downloadName": "ref-05-龚建峰-基于DSP+CPLD的电能质量分析仪的研制.pdf"
+                    "pages": 18,
+                    "bytes": 3585079,
+                    "downloadName": "项目设计报告.pdf"
                 }
             ]
         },
         {
             "id": "photos",
-            "no": "3.3",
+            "no": "3.2",
             "title": "实测照片",
             "desc": "硬件、波形与测试工况的原始照片",
             "items": [
@@ -161,7 +76,7 @@ window.METERING_DATA = {
                     "thumb": "assets/img/thumbs/test-env.jpg",
                     "icon": "img",
                     "kind": "JPG",
-                    "bytes": 222989,
+                    "bytes": 268086,
                     "downloadName": "整机测试环境.jpg"
                 },
                 {
@@ -172,7 +87,7 @@ window.METERING_DATA = {
                     "thumb": "assets/img/thumbs/test-detail.jpg",
                     "icon": "img",
                     "kind": "JPG",
-                    "bytes": 235767,
+                    "bytes": 281977,
                     "downloadName": "测试接线细节.jpg"
                 },
                 {
@@ -183,7 +98,7 @@ window.METERING_DATA = {
                     "thumb": "assets/img/thumbs/test-transformer.jpg",
                     "icon": "img",
                     "kind": "JPG",
-                    "bytes": 164351,
+                    "bytes": 200410,
                     "downloadName": "采样与调理波形.jpg"
                 },
                 {
@@ -194,7 +109,7 @@ window.METERING_DATA = {
                     "thumb": "assets/img/thumbs/test-filter.jpg",
                     "icon": "img",
                     "kind": "JPG",
-                    "bytes": 167343,
+                    "bytes": 203327,
                     "downloadName": "滤波器截止特性.jpg"
                 },
                 {
@@ -205,7 +120,7 @@ window.METERING_DATA = {
                     "thumb": "assets/img/thumbs/test-ads8688.jpg",
                     "icon": "img",
                     "kind": "JPG",
-                    "bytes": 140571,
+                    "bytes": 175828,
                     "downloadName": "ADS8688六通道一致性.jpg"
                 },
                 {
