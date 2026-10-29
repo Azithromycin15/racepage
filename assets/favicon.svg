@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="三相电能计量系统">
+  <rect width="64" height="64" fill="#fffdf8"/>
+  <rect x="5.5" y="5.5" width="53" height="53" fill="none" stroke="#2d4a5c" stroke-width="1.5"/>
+  <path d="M10 25 Q16 13 22 25 T34 25 T46 25 T58 25" fill="none" stroke="#2d4a5c" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M10 39 Q16 27 22 39 T34 39 T46 39 T58 39" fill="none" stroke="#8a4b34" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M10 50 Q16 38 22 50 T34 50 T46 50 T58 50" fill="none" stroke="#6f675a" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

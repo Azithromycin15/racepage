@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基于 ARM 的三相电能计量系统设计 · 完整报告</title>
+<meta name="description" content="基于 ARM 与 ADS8688 的三相电能计量系统完整报告：模拟前端、1024 点 FFT 参数计算、以 Tektronix PA1000 为基准的实测结果、误差来源与适用边界。">
+<meta name="robots" content="index,follow">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f3f0e8">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="基于 ARM 的三相电能计量系统设计">
+<meta property="og:description" content="单芯片 ARM 三相电能计量系统的设计、实测结果与误差讨论。">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="shaders/report.css">
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<div class="sheet">
+
+<header class="masthead">
+  <div class="kicker">
+    <span>大学生创新创业大赛 · 成果展示</span>
+    <span class="right"><a href="index.html">← 资料首页</a><span class="kicker-sep">·</span>大学生创新创业大赛设计 · 2026 年 10 月</span>
+  </div>
+  <h1>基于 ARM 的<span class="title-keep">三相电能计量系统设计</span></h1>
+  <p class="en-title" lang="en">Design of a Three-Phase Energy Metering System Based on ARM</p>
+  <p class="subtitle">便携式电能质量监测装置：模拟前端、采样算法与实测评估</p>
+  <p class="byline"><span></span>负责人:欧梓鹏 · 指导老师:胡万欣<span>自动化 / 嵌入式系统方向</span></p>
+  <p class="masthead-links"><a href="index.html#downloads">下载全部资料</a><span class="sep">·</span><a href="assets/files/thesis.pdf" download="三相电能计量系统设计-毕业设计论文.pdf">下载论文 PDF</a></p>
+
+  <dl class="masthead-meta">
+    <div><dt>研究对象</dt><dd>三相电压、电流与稳态电能质量参数</dd></div>
+    <div><dt>硬件平台</dt><dd>STM32F407ZGT6 · ADS8688</dd></div>
+    <div><dt>参考基准</dt><dd>Tektronix PA1000（单相）</dd></div>
+    <div><dt>文档</dt><dd>设计报告 · 材料册 · 引用文献</dd></div>
+  </dl>
+</header>
+
+<div class="doc">
+
+<nav class="toc" aria-label="页面目录">
+  <h2>目录 / Contents</h2>
+  <ol>
+    <li><a href="#intro"><span class="no">01</span>引言</a></li>
+    <li><a href="#design"><span class="no">02</span>系统设计</a></li>
+    <li><a href="#results"><span class="no">03</span>实验与结果</a></li>
+    <li><a href="#discussion"><span class="no">04</span>讨论</a></li>
+    <li><a href="#conclusion"><span class="no">05</span>结论</a></li>
+  </ol>
+  <div class="toc-tail">
+    <a href="#refs"><span class="no">R</span>参考文献</a>
+    <a href="#appendix"><span class="no">A</span>补充材料</a>
+  </div>
+</nav>
+
+<main class="main" id="main">
+
+<section class="abstract" aria-labelledby="abstract-label">
+  <p class="label" id="abstract-label">摘要 <span class="en" lang="en">Abstract</span></p>
+  <p>本文设计并实现了一套基于 ARM 微控制器的三相电能计量系统，目标是在便携、低成本的单芯片架构下完成稳态电能质量参数的采集与计算。系统由电压/电流互感器、信号调理与二阶抗混叠低通滤波、16 位 8 通道 ADC ADS8688 和 STM32F407ZGT6 组成；以 10.24 kHz 定时触发采样，每帧 1024 点，在 Cortex-M4 上完成 FFT 以及有效值、功率、功率因数、频率、谐波畸变率和三相不平衡度计算，结果经 TFT LCD 实时显示。以 Tektronix PA1000 为参考，在单相工频回路上对 6 组工况进行比对：电压读数最大相对偏差 0.46%，电流最大相对偏差 7.23%，功率因数最大绝对偏差 0.06；三档谐波畸变率的偏差不超过 0.23 个百分点，频率读数与基准一致；平衡负载下不平衡度读数为 0.00%，不平衡负载下可检出电压与电流不平衡度的变化。结果表明，单芯片方案能够完成稳态参数的测量；电流通道的系统偏差、低 Q 值抗混叠滤波器对高次谐波的衰减，以及基于峰值谱线的频率估计，构成当前实现的主要误差来源与适用边界。</p>
+  <p class="keywords"><b>关键词</b>电能质量；三相电能计量；ARM；快速傅里叶变换；谐波畸变率；三相不平衡度</p>
+</section>
+
+<div class="metrics" aria-label="主要结果概览">
+  <div class="metric">
+    <div class="k">电压测量</div>
+    <div class="v">0.46%</div>
+    <div class="d">最大相对偏差 · 6 组工况</div>
+  </div>
+  <div class="metric">
+    <div class="k">电流测量</div>
+    <div class="v">7.23%</div>
+    <div class="d">最大相对偏差 · 6 组工况</div>
+  </div>
+  <div class="metric">
+    <div class="k">谐波畸变率</div>
+    <div class="v">0.23 <span style="font-size:.58em;letter-spacing:0">个百分点</span></div>
+    <div class="d">最大偏差 · 3 个通道</div>
+  </div>
+  <div class="metric">
+    <div class="k">频率读数</div>
+    <div class="v">50 Hz</div>
+    <div class="d">与 PA1000 读数一致</div>
+  </div>
+</div>
+
+<section class="section" id="intro">
+  <h2><span class="no">01</span>引言<span class="en" lang="en">Introduction</span></h2>
+
+  <h3><span class="no">1.1</span>背景与问题</h3>
+  <p>电能质量通常从频率偏差、电压偏差、谐波畸变和三相不平衡等维度描述。三相系统理想情况下各相幅值相等、相位互差 120°，但非线性负荷、不对称负荷以及输配电环节的阻抗会使实际波形偏离正弦与对称条件。谐波与不平衡会增加电机与变压器的附加损耗，电压暂降与中断则影响精密设备的运行；对电网节点和重要用户侧进行持续监测，是定位扰动源、划分责任和验证治理措施的前提。</p>
+  <p>商用固定式监测终端与便携式分析仪（如 Fluke 435 系列、Schneider PowerLogic PM8000 等）功能完整，覆盖暂态事件、波形记录与通信，但价格、功耗与体积面向专业巡检场景。高端分析仪多采用 DSP+MCU 双处理器架构，由 DSP 承担 FFT 与小波运算、MCU 管理人机接口与通信。对于 50 Hz 工频、50 次以内谐波的稳态监测，这一算力配置并非必要；单颗带 FPU 的 ARM 微控制器在理论上可以同时承担采样控制、FFT、参数计算与显示管理。</p>
+  <p>本文关注的问题是：在 10.24 kHz 采样率、6 通道、1024 点 FFT 的条件下，单芯片 ARM 方案能否完成稳态电能质量参数的计算，并达到可用的测量精度；其误差来源与适用边界在哪里。</p>
+
+  <h3><span class="no">1.2</span>技术路线与取舍</h3>
+  <p>电能质量分析装置的主控方案大致有三类。DSP 方案对 FFT、滤波等运算有专门的指令与流水线，适合高采样率与复杂算法，但外设管理与用户界面较弱；FPGA 方案以并行逻辑实现多通道同步采集与实时处理，灵活性和吞吐量高，但开发周期长、成本高；DSP+MCU 双核方案兼顾运算与人机接口，是高端分析仪的常见架构，但系统复杂度、功耗与成本同步上升。</p>
+  <p>本设计选择单核 ARM，依据有三点。第一，50 Hz 基波与 50 次以内谐波的分析带宽有限，10.24 kHz 采样率下 6 通道的数据率在 Cortex-M4 的处理能力之内；第二，STM32F407 带硬件浮点单元，FFT 与均方根运算无需定点化改造；第三，单芯片即可管理 LCD、按键与通信接口，硬件结构简单，便于分模块验证。</p>
+  <p>这一选择的代价是：没有专用 DSP 的运算余量，也没有 FPGA 的并行通道；算法分辨率、滤波器设计与通道标定需要更谨慎地权衡。本文通过实测数据说明这些代价在哪些范围内可以接受。</p>
+
+  <h3><span class="no">1.3</span>本文工作</h3>
+  <p>本文的工作包括三个方面：(1) 设计并搭建 6 通道模拟前端、抗混叠滤波与 ADS8688 数据采集硬件；(2) 实现定时采样、SPI 驱动、1024 点 FFT 与参数计算软件；(3) 以 PA1000 为参考完成模块级与整机级测试，并对误差来源、分辨率限制与适用边界进行讨论。</p>
+  <p>本文不覆盖电压暂降、闪变、暂态事件与间谐波等非稳态指标；整机比对在单相回路上完成，三相不平衡度单独测试。这些范围限制在第 4 节集中说明。</p>
+</section>
+
+<section class="section" id="design">
+  <h2><span class="no">02</span>系统设计<span class="en" lang="en">System Design</span></h2>
+
+  <h3><span class="no">2.1</span>设计约束与总体结构</h3>
+  <p>系统面向 50 Hz 工频稳态信号，设计分析范围覆盖 2–50 次谐波，即最高分析频率 2.5 kHz。为满足采样定理，采样率取 10.24 kHz；每帧 1024 点，对应约 0.1 s、5 个工频周期，FFT 频率分辨率为 <i>f</i><sub>s</sub>/<i>N</i> = 10 Hz。6 个测量通道（3 路电压、3 路电流）使用相同的调理与滤波网络，以便通道间保持一致。</p>
+
+  <dl class="specs">
+    <div class="spec"><dt>主控</dt><dd>STM32F407ZGT6，Cortex-M4，168 MHz，硬件 FPU</dd></div>
+    <div class="spec"><dt>ADC</dt><dd>ADS8688，16 bit，500 kSPS，8 单端 / 4 差分</dd></div>
+    <div class="spec"><dt>通道</dt><dd>3 路电压 + 3 路电流</dd></div>
+    <div class="spec"><dt>采样</dt><dd>10.24 kHz 定时触发，1024 点 / 帧</dd></div>
+    <div class="spec"><dt>量程</dt><dd>±5.12 V，1 LSB = 0.15625 mV</dd></div>
+    <div class="spec"><dt>分析带宽</dt><dd>2.5 kHz（50 次谐波）；受滤波器幅频特性限制</dd></div>
+    <div class="spec"><dt>参数</dt><dd>U<sub>rms</sub>、I<sub>rms</sub>、P、Q、S、PF、f、THD、ε</dd></div>
+    <div class="spec"><dt>显示</dt><dd>TFT LCD 实时刷新</dd></div>
+  </dl>
+
+  <p>总体结构如图 1。模拟与采集部分完成幅值变换、电磁隔离、限幅保护、相位补偿与抗混叠滤波；ADS8688 在 TIM3 触发下自动扫描 6 个通道；STM32F407 通过 SPI1 读取转换结果，在时域计算有效值与功率，在频域完成 FFT 及谐波、相位、频率和不平衡度计算；结果送 TFT LCD 显示。</p>
+
+  <figure id="fig-architecture">
+    <div class="diagram">
+      <svg viewBox="0 0 960 330" role="img" aria-labelledby="fig1-title fig1-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="fig1-title">系统总体结构与信号链</title>
+        <desc id="fig1-desc">三相电压电流经互感器隔离、信号调理和抗混叠低通滤波后进入 ADS8688 六通道采样，STM32F407 通过 SPI 读取数据并完成 FFT 与参数计算，结果送 LCD 显示；TIM3 以 10.24 kHz 触发采样。</desc>
+        <defs>
+          <marker id="fig1-arw" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0 0 L8 4 L0 8 Z" fill="#8a8274"/>
+          </marker>
+        </defs>
+        <g font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+          <text x="20" y="38" font-size="10" letter-spacing="2.4" fill="#948b7b">模拟与采集</text>
+          <text x="676" y="38" font-size="10" letter-spacing="2.4" fill="#948b7b">计算与显示</text>
+          <line x1="658" y1="52" x2="658" y2="316" stroke="#cfc6b4" stroke-width="1" stroke-dasharray="3 5"/>
+
+          <rect x="20" y="92" width="104" height="78" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="72" y="123" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">三相电压</text>
+          <text x="72" y="141" text-anchor="middle" font-size="11" fill="#4b473f">与电流</text>
+
+          <rect x="148" y="92" width="170" height="78" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="233" y="115" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">互感器与调理</text>
+          <text x="233" y="133" text-anchor="middle" font-size="10.5" fill="#6f675a">隔离 · 缩放 · 限幅</text>
+          <text x="233" y="149" text-anchor="middle" font-size="10.5" fill="#6f675a">相位补偿</text>
+
+          <rect x="342" y="92" width="140" height="78" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="412" y="115" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">抗混叠低通</text>
+          <text x="412" y="133" text-anchor="middle" font-size="10.5" fill="#6f675a">f₀ ≈ 2.50 kHz</text>
+          <text x="412" y="149" text-anchor="middle" font-size="10.5" fill="#6f675a">Q ≈ 0.50</text>
+
+          <rect x="506" y="92" width="140" height="78" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".5"/>
+          <text x="576" y="115" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">ADS8688</text>
+          <text x="576" y="133" text-anchor="middle" font-size="10.5" fill="#6f675a">16 bit · 6 通道</text>
+          <text x="576" y="149" text-anchor="middle" font-size="10.5" fill="#6f675a">±5.12 V · 扫描</text>
+
+          <rect x="670" y="92" width="156" height="78" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".5"/>
+          <text x="748" y="115" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">STM32F407</text>
+          <text x="748" y="133" text-anchor="middle" font-size="10.5" fill="#6f675a">1024 点 FFT</text>
+          <text x="748" y="149" text-anchor="middle" font-size="10.5" fill="#6f675a">参数计算</text>
+
+          <rect x="850" y="92" width="90" height="78" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="895" y="123" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">LCD</text>
+          <text x="895" y="141" text-anchor="middle" font-size="11" fill="#4b473f">显示</text>
+
+          <line x1="124" y1="131" x2="141" y2="131" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <line x1="318" y1="131" x2="335" y2="131" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <line x1="482" y1="131" x2="499" y2="131" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <line x1="646" y1="131" x2="663" y2="131" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <line x1="826" y1="131" x2="843" y2="131" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+
+          <text x="72" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">3 × U + 3 × I</text>
+          <text x="233" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">PT202H1 / CT21C</text>
+          <text x="412" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">470 / 510 Ω · 0.13 μF</text>
+          <text x="576" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">SPI1 · 自动扫描</text>
+          <text x="748" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">168 MHz · FPU</text>
+          <text x="895" y="188" text-anchor="middle" font-size="9.5" fill="#948b7b">实时刷新</text>
+
+          <rect x="506" y="240" width="320" height="62" fill="#f7f9f9" stroke="#2d4a5c" stroke-opacity=".45"/>
+          <text x="666" y="263" text-anchor="middle" font-size="11.5" font-weight="600" fill="#211f1a">TIM3 触发采样 · SPI1 读取</text>
+          <text x="666" y="281" text-anchor="middle" font-size="10" fill="#6f675a">6 × 1024 点缓冲 · 计算与采样解耦</text>
+
+          <line x1="576" y1="240" x2="576" y2="176" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <line x1="748" y1="240" x2="748" y2="176" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig1-arw)"/>
+          <text x="566" y="226" text-anchor="end" font-size="9" fill="#948b7b">触发</text>
+          <text x="758" y="226" font-size="9" fill="#948b7b">SPI 数据</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">图 1</span>系统总体结构与信号链。模拟与采集部分完成隔离、调理与抗混叠滤波；数字部分完成采样控制、FFT 与参数显示。<span class="fig-en" lang="en">Fig. 1 Overall architecture and signal chain of the system.</span><span class="fig-note scroll-hint">窄屏可横向滑动查看完整图表。</span></figcaption>
+  </figure>
+
+  <p>采样时序由 TIM3 的 84 MHz 时钟、预分频系数 99 和自动重装值 81 决定，实际触发频率为 10.2439 kHz，与标称 10.24 kHz 相差 0.038%。在 50 Hz 处，这一差异对应的频率偏差约 0.02 Hz，小于 10 Hz 的 FFT 分辨率；但它使每帧长度为 4.998 个工频周期，而非严格的 5 个周期，构成轻微的频谱泄漏来源。</p>
+  <p>ADC 配置为 ±5.12 V 双极输入，1 LSB = 10.24 V / 2<sup>16</sup> = 0.15625 mV。该量化步长是电压、电流通道的分辨率下限；实际噪声与通道耦合会使有效分辨率低于 16 位。</p>
+
+  <h3><span class="no">2.2</span>模拟前端与抗混叠滤波</h3>
+  <p>电压通道采用 PT202H1 电压互感器，电流通道采用 CT21C 2.0 电流互感器（变比 2000:1）。互感器同时完成幅值变换与电网侧、测量侧的电磁隔离。调理电路将互感器二次电流转换为电压，设置限幅保护与相位补偿；电压通道在额定输入 380 V 时输出约 3.53 V（约 100:1），电流通道额定输入 5 A 对应 2.5 mA 二次电流。</p>
+  <p>每通道后接二阶压控电压源型低通滤波器，元件取值为 <i>R</i><sub>1</sub> = 470 Ω、<i>R</i><sub>2</sub> = 510 Ω、<i>C</i><sub>1</sub> = <i>C</i><sub>2</sub> = 0.13 μF。该网络的自然频率为 <i>f</i><sub>0</sub> = 1 / (2π<i>C</i>√(<i>R</i><sub>1</sub><i>R</i><sub>2</sub>)) ≈ 2500.6 Hz，单位增益下的品质因数为 <i>Q</i> = √(<i>R</i><sub>1</sub><i>R</i><sub>2</sub>) / (<i>R</i><sub>1</sub> + <i>R</i><sub>2</sub>) ≈ 0.50。由此，<i>f</i><sub>0</sub> 处的增益约为 0.50（−6 dB），−3 dB 点约在 1.61 kHz；2.5 kHz 是自然频率，也是 50 次谐波频率，并不是 −3 dB 截止频率。</p>
+  <p>实测中，输入 2.5 kHz 正弦时输出峰峰值 99.2 mV，约为输入的一半（增益 0.50），与 <i>Q</i> ≈ 0.50 的计算一致。1 kHz 处该网络的增益约 0.86（−1.3 dB），2.5 kHz 处为 0.50（−6 dB）；因此它并不是一条在 2.5 kHz 内平坦的通带，而是从数百赫兹起缓慢滚降的二阶低通。</p>
+  <p>对本文的测量而言，这意味着高次谐波幅值被系统性压低，THD 与分次谐波读数会受幅频响应影响；六通道采用相同网络与元件取值，通道间相对相移较小，三相相位差与不平衡度计算所受影响有限。电压、电流通道之间的残余相移由各自的 RC 网络补偿，残余部分进入功率因数误差。</p>
+  <p>这一滤波器的设计目标是抗混叠，而不是提供平坦的测量带宽。提高 <i>Q</i> 值可以改善 2.5 kHz 内的平坦度，但在相同自然频率下会减弱对高频分量的衰减；更可行的方案是增加滤波阶数，或在软件中按实测幅频/相频响应做校正。</p>
+
+  <figure id="fig-hardware">
+    <div class="plate wide-left">
+      <div class="panel">
+        <a href="assets/img/hardware-modules.jpg" target="_blank" rel="noopener" title="查看原图：硬件平台模块划分">
+          <img src="assets/img/hardware-modules.jpg" alt="硬件平台俯视照片，以红色虚线框标出 1 至 6 号模块：采样调理、抗混叠滤波、电源、ADS8688 采样、STM32 主控与 LCD。" width="1100" height="700" decoding="async">
+        </a>
+        <span class="panel-no">(a)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/hardware-overall.jpg" target="_blank" rel="noopener" title="查看原图：硬件平台整体布局">
+          <img src="assets/img/hardware-overall.jpg" alt="硬件平台整体照片，可见电源模块、采样电路、主控板与接线。" width="840" height="825" decoding="async">
+        </a>
+        <span class="panel-no">(b)</span>
+      </div>
+    </div>
+    <figcaption><span class="fno">图 2</span>硬件平台。(a) 模块划分：1 采样与信号调理，2 二阶抗混叠滤波，3 系统电源，4 ADS8688 采样，5 STM32 主控，6 LCD 显示（屏幕内容已隐去）；(b) 整体布局。<span class="fig-en" lang="en">Fig. 2 Hardware platform and module layout.</span><span class="fig-note">点击图像可查看完整画面。</span></figcaption>
+  </figure>
+
+  <p>硬件平台按模块划分，便于分模块测试与故障定位；代价是跳线较多、体积偏大，模拟走线较长。这一结构是实验验证阶段的形态，也是后续单板化改进的对象。</p>
+
+  <h3><span class="no">2.3</span>数据采集与软件流程</h3>
+  <p>ADC 选型在 AD7606 与 ADS8688 之间进行，主要参数见表 1。两者均为 16 位、8 通道；ADS8688 的最大吞吐量为 500 kSPS，高于 AD7606 的 200 kSPS，支持 8 路单端或 4 路差分输入，采用 SPI 接口，内置 4.096 V 基准与自动通道扫描。对本文 6 通道、10.24 kHz 的采样需求，两者在吞吐量上都有余量；选择 ADS8688 的主要原因是单端输入便于与单端调理电路衔接，SPI 占用引脚少，自动扫描简化了驱动逻辑。</p>
+
+  <div class="table-wrap" id="table1">
+    <table>
+      <caption><span class="tno">表 1</span>AD7606 与 ADS8688 主要参数对比</caption>
+      <thead>
+        <tr><th scope="col">参数</th><th scope="col">AD7606</th><th scope="col">ADS8688</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">分辨率</th><td>16 bit</td><td>16 bit</td></tr>
+        <tr><th scope="row">最大吞吐量</th><td class="num">200 kSPS</td><td class="num">500 kSPS</td></tr>
+        <tr><th scope="row">输入方式</th><td>仅差分</td><td>8 单端 / 4 差分</td></tr>
+        <tr><th scope="row">模拟输入范围</th><td>±10 V、±5 V</td><td>±10.24 V、±5.12 V、±2.56 V</td></tr>
+        <tr><th scope="row">基准电压</th><td>2.5 V（外部或内部）</td><td>4.096 V（内置）</td></tr>
+        <tr><th scope="row">数据接口</th><td>并行</td><td>SPI</td></tr>
+        <tr><th scope="row">内置功能</th><td>数字滤波器</td><td>基准、自动通道扫描</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">数据来源：两款器件的数据手册；表中为典型值。</p>
+
+  <p>系统将 ADS8688 配置为 6 通道自动扫描、±5.12 V 双极输入。SPI1 工作于主机模式、8 位数据帧、双线全双工，时钟极性与相位按 ADS8688 时序要求设置。TIM3 中断以 10.24 kHz 触发一次扫描，回调中读取 6 通道转换值并写入 6×1024 缓冲区；缓冲区写满后置位采样完成标志。主循环检测到标志后执行 FFT 与参数计算，计算与采样解耦，避免计算期间丢点。</p>
+  <p>软件数据流与参数映射如图 3。时域支路对每帧 1024 点计算 U<sub>rms</sub>、I<sub>rms</sub>、有功功率 <i>P</i> 与视在功率 <i>S</i>；频域支路对 6 个通道分别做 1024 点 FFT，由基波复数求电压与电流的相位差，由幅谱求各次谐波幅值、THD 与峰值频率，由三相基波复数经对称分量法求不平衡度。</p>
+
+  <figure id="fig-algorithm">
+    <div class="diagram">
+      <svg viewBox="0 0 960 410" role="img" aria-labelledby="fig3-title fig3-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="fig3-title">软件数据流与参数映射</title>
+        <desc id="fig3-desc">采样缓冲分为时域与频域两条支路。时域计算有效值和功率；频域做 1024 点 FFT，再由基波相位差计算功率因数，由幅谱计算 THD 与频率，由三相基波复数计算不平衡度。</desc>
+        <defs>
+          <marker id="fig3-arw" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0 0 L8 4 L0 8 Z" fill="#8a8274"/>
+          </marker>
+        </defs>
+        <g font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+          <rect x="305" y="20" width="300" height="58" fill="#f7f9f9" stroke="#2d4a5c" stroke-opacity=".55"/>
+          <text x="455" y="44" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">采样缓冲 6 × 1024 点</text>
+          <text x="455" y="62" text-anchor="middle" font-size="10.5" fill="#6f675a">每帧约 0.1 s（5 个工频周期）</text>
+
+          <text x="40" y="108" font-size="10" letter-spacing="2.2" fill="#948b7b">时域计算</text>
+          <text x="330" y="108" font-size="10" letter-spacing="2.2" fill="#948b7b">频域计算</text>
+          <text x="650" y="108" font-size="10" letter-spacing="2.2" fill="#948b7b">参数输出</text>
+
+          <rect x="40" y="126" width="250" height="64" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="165" y="153" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">帧内统计</text>
+          <text x="165" y="171" text-anchor="middle" font-size="10.5" fill="#6f675a">U²、I²、u·i 的平均</text>
+
+          <rect x="40" y="222" width="250" height="64" fill="#fcfaf4" stroke="#c9c0ae"/>
+          <text x="165" y="249" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">基本电量</text>
+          <text x="165" y="267" text-anchor="middle" font-size="10.5" fill="#6f675a">有效值 U, I · 功率 P, S</text>
+
+          <rect x="330" y="126" width="250" height="64" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="455" y="153" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">1024 点 FFT</text>
+          <text x="455" y="171" text-anchor="middle" font-size="10.5" fill="#6f675a">每通道复数谱 X[k]</text>
+
+          <rect x="330" y="222" width="250" height="64" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="455" y="249" text-anchor="middle" font-size="12.5" font-weight="600" fill="#211f1a">基波与幅谱</text>
+          <text x="455" y="267" text-anchor="middle" font-size="10.5" fill="#6f675a">X[5]；各次谐波幅值</text>
+
+          <rect x="650" y="118" width="280" height="56" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="666" y="140" font-size="12" font-weight="600" fill="#211f1a">基波相位差 φ₁</text>
+          <text x="666" y="157" font-size="10" fill="#6f675a">PF = |cos φ₁|，Q = P tan φ₁</text>
+
+          <rect x="650" y="188" width="280" height="56" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="666" y="210" font-size="12" font-weight="600" fill="#211f1a">谐波幅值（2–50 次）</text>
+          <text x="666" y="227" font-size="10" fill="#6f675a">THD，h = 2…50</text>
+
+          <rect x="650" y="258" width="280" height="56" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="666" y="280" font-size="12" font-weight="600" fill="#211f1a">幅谱峰值 bin k</text>
+          <text x="666" y="297" font-size="10" fill="#6f675a">f = k · fs / N</text>
+
+          <rect x="650" y="328" width="280" height="56" fill="#fcfaf4" stroke="#2d4a5c" stroke-opacity=".4"/>
+          <text x="666" y="350" font-size="12" font-weight="600" fill="#211f1a">三相基波复数</text>
+          <text x="666" y="367" font-size="10" fill="#6f675a">对称分量 → ε</text>
+
+          <path d="M305 49 H165 V120" fill="none" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="455" y1="78" x2="455" y2="120" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="165" y1="190" x2="165" y2="216" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="455" y1="190" x2="455" y2="216" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+
+          <line x1="580" y1="254" x2="615" y2="254" stroke="#8a8274" stroke-width="1.1"/>
+          <line x1="615" y1="146" x2="615" y2="356" stroke="#8a8274" stroke-width="1.1"/>
+          <line x1="615" y1="146" x2="644" y2="146" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="615" y1="216" x2="644" y2="216" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="615" y1="286" x2="644" y2="286" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <line x1="615" y1="356" x2="644" y2="356" stroke="#8a8274" stroke-width="1.1" marker-end="url(#fig3-arw)"/>
+          <circle cx="615" cy="216" r="2" fill="#8a8274"/>
+          <circle cx="615" cy="254" r="2" fill="#8a8274"/>
+          <circle cx="615" cy="286" r="2" fill="#8a8274"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">图 3</span>软件数据流与参数映射。时域支路计算有效值与功率；频域支路完成相位、THD、频率与不平衡度计算。<span class="fig-en" lang="en">Fig. 3 Software data flow and parameter mapping.</span><span class="fig-note scroll-hint">窄屏可横向滑动查看完整图表。</span></figcaption>
+  </figure>
+
+  <p>数据帧率的上限约为 10 帧/秒（每帧约 0.1 s）；实际刷新率还取决于 FFT、参数计算与 LCD 刷新耗时，本文未单独测量。</p>
+  <p>频率估计取幅谱最大峰对应的 bin <i>k</i>，按 <i>f</i> = <i>k</i>·<i>f</i><sub>s</sub>/<i>N</i> 反算。由于 <i>f</i><sub>s</sub>/<i>N</i> = 10 Hz，该方法只能分辨 10 Hz 的频率间隔；在 50 Hz 工频下读数稳定为 50 Hz，但不能用于变频或频率偏差的精细测量。这一限制在第 3.4 节结合实测读数进一步说明。</p>
+
+  <h3><span class="no">2.4</span>参数计算</h3>
+  <p>有效值与功率按定义法计算。设每帧采样点数为 <i>N</i> = 1024，<i>u</i>[<i>n</i>]、<i>i</i>[<i>n</i>] 为电压、电流的离散序列：</p>
+
+  <div class="eq" id="eq-rms">
+    <div class="eq-body">
+      <div class="eq-stack">
+        <math display="block" aria-label="电压有效值">
+          <msub><mi>U</mi><mtext>rms</mtext></msub><mo>=</mo>
+          <msqrt><mfrac><mn>1</mn><mi>N</mi></mfrac><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover><msup><mi>u</mi><mn>2</mn></msup><mo stretchy="false">[</mo><mi>n</mi><mo stretchy="false">]</mo></msqrt>
+        </math>
+        <math display="block" aria-label="电流有效值">
+          <msub><mi>I</mi><mtext>rms</mtext></msub><mo>=</mo>
+          <msqrt><mfrac><mn>1</mn><mi>N</mi></mfrac><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover><msup><mi>i</mi><mn>2</mn></msup><mo stretchy="false">[</mo><mi>n</mi><mo stretchy="false">]</mo></msqrt>
+        </math>
+      </div>
+    </div>
+    <span class="eq-no">(1)</span>
+  </div>
+
+  <div class="eq" id="eq-power">
+    <div class="eq-body">
+      <div class="eq-stack">
+        <math display="block" aria-label="有功功率">
+          <mi>P</mi><mo>=</mo><mfrac><mn>1</mn><mi>N</mi></mfrac><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover><mi>u</mi><mo stretchy="false">[</mo><mi>n</mi><mo stretchy="false">]</mo><mo>⋅</mo><mi>i</mi><mo stretchy="false">[</mo><mi>n</mi><mo stretchy="false">]</mo>
+        </math>
+        <math display="block" aria-label="视在功率">
+          <mi>S</mi><mo>=</mo><msub><mi>U</mi><mtext>rms</mtext></msub><mo>⋅</mo><msub><mi>I</mi><mtext>rms</mtext></msub><mo>,</mo><mspace width="1em"/><msub><mi>P</mi><mtext>total</mtext></msub><mo>=</mo><munder><mo>∑</mo><mi>φ</mi></munder><msub><mi>P</mi><mi>φ</mi></msub>
+        </math>
+      </div>
+    </div>
+    <span class="eq-no">(2)</span>
+  </div>
+
+  <p>三相总有功功率为各相之和；视在功率按各相 U<sub>rms</sub>I<sub>rms</sub> 求和。功率因数由基波相位差计算：对电压、电流序列分别做 FFT，取基波频点复数 <i>U</i><sub>1</sub>、<i>I</i><sub>1</sub>，φ<sub>1</sub> = ∠<i>U</i><sub>1</sub> − ∠<i>I</i><sub>1</sub>。</p>
+
+  <div class="eq" id="eq-pf">
+    <div class="eq-body">
+      <div class="eq-stack">
+        <math display="block" aria-label="基波相位差">
+          <msub><mi>φ</mi><mn>1</mn></msub><mo>=</mo><mi>∠</mi><msub><mi>U</mi><mn>1</mn></msub><mo>−</mo><mi>∠</mi><msub><mi>I</mi><mn>1</mn></msub>
+        </math>
+        <math display="block" aria-label="功率因数">
+          <mtext>PF</mtext><mo>=</mo><mrow><mo>|</mo><mo>cos</mo><msub><mi>φ</mi><mn>1</mn></msub><mo>|</mo></mrow>
+        </math>
+      </div>
+    </div>
+    <span class="eq-no">(3)</span>
+  </div>
+
+  <p>严格定义的功率因数为 <i>P</i>/<i>S</i>；在谐波畸变较小（本文 THD 不超过 10%）时，两者差异有限。本文采用基波相位差，是为了与相位补偿电路的设计目标对应。</p>
+  <p>总谐波畸变率按 2–50 次谐波计算：</p>
+
+  <div class="eq" id="eq-thd">
+    <div class="eq-body">
+      <math display="block" aria-label="电压总谐波畸变率">
+        <msub><mtext>THD</mtext><mi>U</mi></msub><mo>=</mo>
+        <mfrac>
+          <msqrt><munderover><mo>∑</mo><mrow><mi>h</mi><mo>=</mo><mn>2</mn></mrow><mn>50</mn></munderover><msubsup><mi>U</mi><mi>h</mi><mn>2</mn></msubsup></msqrt>
+          <msub><mi>U</mi><mn>1</mn></msub>
+        </mfrac>
+        <mo>×</mo><mn>100</mn><mo>%</mo>
+      </math>
+    </div>
+    <span class="eq-no">(4)</span>
+  </div>
+
+  <p>三相不平衡度采用对称分量法。设 <i>a</i> = e<sup>j120°</sup>，由三相基波复数 <i>U</i><sub>a</sub>、<i>U</i><sub>b</sub>、<i>U</i><sub>c</sub> 求正序与负序分量：</p>
+
+  <div class="eq" id="eq-seq">
+    <div class="eq-body">
+      <div class="eq-stack">
+        <math display="block" aria-label="正序分量">
+          <msup><mi>U</mi><mo>+</mo></msup><mo>=</mo>
+          <mfrac><mrow><msub><mi>U</mi><mtext>a</mtext></msub><mo>+</mo><mi>a</mi><msub><mi>U</mi><mtext>b</mtext></msub><mo>+</mo><msup><mi>a</mi><mn>2</mn></msup><msub><mi>U</mi><mtext>c</mtext></msub></mrow><mn>3</mn></mfrac>
+        </math>
+        <math display="block" aria-label="负序分量">
+          <msup><mi>U</mi><mo>−</mo></msup><mo>=</mo>
+          <mfrac><mrow><msub><mi>U</mi><mtext>a</mtext></msub><mo>+</mo><msup><mi>a</mi><mn>2</mn></msup><msub><mi>U</mi><mtext>b</mtext></msub><mo>+</mo><mi>a</mi><msub><mi>U</mi><mtext>c</mtext></msub></mrow><mn>3</mn></mfrac>
+        </math>
+      </div>
+    </div>
+    <span class="eq-no">(5)</span>
+  </div>
+
+  <div class="eq" id="eq-unbalance">
+    <div class="eq-body">
+      <math display="block" aria-label="三相不平衡度">
+        <msub><mi>ε</mi><mi>U</mi></msub><mo>=</mo>
+        <mfrac><mrow><mo>|</mo><msup><mi>U</mi><mo>−</mo></msup><mo>|</mo></mrow><mrow><mo>|</mo><msup><mi>U</mi><mo>+</mo></msup><mo>|</mo></mrow></mfrac>
+        <mo>×</mo><mn>100</mn><mo>%</mo>
+      </math>
+    </div>
+    <span class="eq-no">(6)</span>
+  </div>
+
+  <p class="eq-note">式中 <i>N</i> 为每帧采样点数，<i>u</i>[<i>n</i>]、<i>i</i>[<i>n</i>] 为离散序列，<i>U</i><sub>h</sub> 为第 <i>h</i> 次谐波有效值，<i>U</i><sup>+</sup>、<i>U</i><sup>−</sup> 为正序、负序基波复数。本文只使用基波分量计算不平衡度，谐波对不平衡度的影响未纳入；零序分量也未参与，三相四线制不对称负载下的零序影响需另行评估。</p>
+</section>
+
+<section class="section" id="results">
+  <h2><span class="no">03</span>实验与结果<span class="en" lang="en">Experiments and Results</span></h2>
+
+  <h3><span class="no">3.1</span>测试平台与方法</h3>
+  <p>测试分为模块级与整机级两部分。模块级测试在焊接完成的硬件平台上进行，使用 Siglent SDG2042X 任意波形发生器、数字示波器与直流电源；整机测试以单相工频电源、可调阻性/阻感性负载为对象，参考仪器为 Tektronix PA1000 单相功率分析仪。三相不平衡度测试使用三个可调滑动变阻器作为三相负载。测试环境与接线如图 4。</p>
+  <p>PA1000 的电压、电流、功率因数、THD 与频率读数作为比对基准。需要说明三点：其一，整机基本电参数在单相回路上完成，系统六通道独立设计与验证，三相三线/四线制可通过前端接线切换，但本文不把单相结果外推为三相整机精度；其二，PA1000 为单相功率分析仪，不能提供三相不平衡度基准；其三，参考仪器未做不确定度评定，本文给出的偏差是两台装置读数之差，不等同于计量学意义上的误差限。</p>
+  <p>误差定义如下：δ<i>x</i> = (<i>x</i><sub>sys</sub> − <i>x</i><sub>ref</sub>) / <i>x</i><sub>ref</sub> × 100%；功率因数采用绝对差值 ΔPF = PF<sub>sys</sub> − PF<sub>ref</sub>，因为 PF 是 0–1 的无量纲量，百分比误差在接近 1 时缺乏物理意义。表中所有偏差保留两位小数。</p>
+
+  <figure id="fig-environment">
+    <div class="plate crop-4x3">
+      <div class="panel">
+        <a href="assets/img/test-env.jpg" target="_blank" rel="noopener" title="查看原图：整机测试环境">
+          <img src="assets/img/test-env-crop.jpg" alt="实验台上的示波器、信号发生器、功率分析仪与硬件平台；展示用裁切。" width="900" height="675" decoding="async">
+        </a>
+        <span class="panel-no">(a)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/test-detail.jpg" target="_blank" rel="noopener" title="查看原图：测试接线细节">
+          <img src="assets/img/test-detail.jpg" alt="测试接线与负载连接的局部细节。" width="1100" height="904" decoding="async">
+        </a>
+        <span class="panel-no">(b)</span>
+      </div>
+    </div>
+    <figcaption><span class="fno">图 4</span>整机测试环境与接线。(a) 实验台；(b) 负载与测试接线细节。<span class="fig-en" lang="en">Fig. 4 Test bench and wiring.</span><span class="fig-note">展示用裁切；完整画面可点击查看。</span></figcaption>
+  </figure>
+
+  <h3><span class="no">3.2</span>模块级验证</h3>
+  <p><strong class="run">采样与调理电路。</strong>A 相电压通道输入 20 Vpp 标准正弦，经互感器与调理电路后输出 0.2 Vpp，缩放比约 100:1，与设计一致。图 5(a) 为示波器测得的输入/输出波形，输入由 SDG2042X 产生，频率 50 Hz。</p>
+  <p><strong class="run">抗混叠滤波电路。</strong>输入 2.5 kHz 正弦时，输出峰峰值 99.2 mV，约为输入的一半（增益 0.50）。按 2.2 节的计算，该网络在自然频率处的增益为 <i>Q</i> ≈ 0.50，实测与计算一致。图 5(b) 为滤波器输出波形。需要再次指出，−3 dB 点约在 1.61 kHz，2.5 kHz 是自然频率；因此该滤波器在 2.5 kHz 处已经衰减 6 dB，不能视为平坦通带。</p>
+  <p><strong class="run">ADS8688 采样电路。</strong>将 6 个通道短接，输入 3.300 V 直流，配置 ±5.12 V 量程与自动扫描。照片所示单帧读数为 CH0 3300.00 mV、CH1 3300.94 mV、CH2 3300.00 mV、CH3–CH5 3299.69 mV，通道极差 1.25 mV，约 8 LSB。理论量化步长为 0.15625 mV，实际极差大于单一量化误差，来源包括电源纹波、采样线长度与通道间耦合。相对于 3.300 V 输入，1.25 mV 约为 0.04%；在小信号通道，这一固定波动的影响需要另行评估。</p>
+  <p>单帧读数只能反映该帧的通道一致性，不能替代长期漂移与噪声统计；本文未对多帧数据做标准差计算。</p>
+
+  <figure id="fig-waveforms">
+    <div class="plate">
+      <div class="panel">
+        <a href="assets/img/test-transformer.jpg" target="_blank" rel="noopener" title="查看原图：采样与调理电路波形">
+          <img src="assets/img/test-transformer.jpg" alt="示波器显示 50 Hz、20 Vpp 输入与 0.2 Vpp 输出的正弦波形；下方为 SDG2042X 信号发生器。" width="825" height="1100" decoding="async">
+        </a>
+        <span class="panel-no">(a)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/test-filter.jpg" target="_blank" rel="noopener" title="查看原图：滤波器截止特性测试">
+          <img src="assets/img/test-filter.jpg" alt="示波器显示 2.5 kHz 滤波电路输出波形，峰峰值约 99.2 mV。" width="818" height="1100" decoding="async">
+        </a>
+        <span class="panel-no">(b)</span>
+      </div>
+    </div>
+    <figcaption><span class="fno">图 5</span>采样调理与抗混叠滤波电路的实测波形。(a) 电压通道 20 Vpp 输入、0.2 Vpp 输出（约 100:1）；(b) 2.5 kHz 输入下滤波器输出峰峰值 99.2 mV，约为输入的一半。<span class="fig-en" lang="en">Fig. 5 Measured waveforms of the conditioning and anti-aliasing circuits.</span><span class="fig-note">幅值与频率读数以示波器屏幕测量值为准；信号发生器设置为 50 Hz / 2.5 kHz 正弦。</span></figcaption>
+  </figure>
+
+  <figure id="fig-adc">
+    <div class="panel">
+      <a href="assets/img/test-ads8688.jpg" target="_blank" rel="noopener" title="查看原图：ADS8688 六通道一致性测试">
+        <img src="assets/img/test-ads8688.jpg" alt="信号发生器输出 3.300 V 直流；LCD 显示六个通道读数约 3300 mV，通道间有约 1 mV 差异。" width="1100" height="825" decoding="async">
+      </a>
+    </div>
+    <figcaption><span class="fno">图 6</span>ADS8688 六通道一致性测试。3.300 V 直流同时接入 6 个短接通道；单帧读数 CH0 3300.00 mV、CH1 3300.94 mV、CH2 3300.00 mV、CH3–CH5 3299.69 mV，极差 1.25 mV（约 8 LSB）。<span class="fig-en" lang="en">Fig. 6 Six-channel consistency test of the ADS8688.</span><span class="fig-note">图中为单帧读数；长期漂移与噪声统计未做。</span></figcaption>
+  </figure>
+
+  <h3><span class="no">3.3</span>基本电参数</h3>
+  <p>6 组工况覆盖 21.68–179.56 V、0.124–1.250 A 的电压电流范围，负载为阻性与阻感性。测量结果与偏差见表 2，偏差分布见图 7。</p>
+
+  <div class="table-wrap" id="table2" role="region" tabindex="0" aria-label="表 2 基本电参数测量结果，可横向滚动">
+    <table class="wide">
+      <caption><span class="tno">表 2</span>基本电参数测量结果与偏差（参考基准：Tektronix PA1000）</caption>
+      <thead>
+        <tr>
+          <th rowspan="2" scope="col">工况</th>
+          <th colspan="3" scope="colgroup">Tektronix PA1000（参考）</th>
+          <th colspan="3" scope="colgroup">本系统</th>
+          <th colspan="3" scope="colgroup">偏差</th>
+        </tr>
+        <tr>
+          <th class="num" scope="col">U / V</th>
+          <th class="num" scope="col">I / A</th>
+          <th class="num" scope="col">PF</th>
+          <th class="num" scope="col">U / V</th>
+          <th class="num" scope="col">I / A</th>
+          <th class="num" scope="col">PF</th>
+          <th class="num" scope="col">δ<sub>U</sub> / %</th>
+          <th class="num" scope="col">δ<sub>I</sub> / %</th>
+          <th class="num" scope="col">ΔPF</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">1</th><td class="num">21.68</td><td class="num">0.124</td><td class="num">0.81</td><td class="num">21.63</td><td class="num">0.119</td><td class="num">0.75</td><td class="num">−0.23</td><td class="num">−4.03</td><td class="num">−0.06</td></tr>
+        <tr><th scope="row">2</th><td class="num">45.86</td><td class="num">0.249</td><td class="num">0.85</td><td class="num">45.78</td><td class="num">0.231</td><td class="num">0.80</td><td class="num">−0.17</td><td class="num">−7.23</td><td class="num">−0.05</td></tr>
+        <tr><th scope="row">3</th><td class="num">60.04</td><td class="num">0.574</td><td class="num">0.89</td><td class="num">59.93</td><td class="num">0.537</td><td class="num">0.83</td><td class="num">−0.18</td><td class="num">−6.45</td><td class="num">−0.06</td></tr>
+        <tr><th scope="row">4</th><td class="num">114.67</td><td class="num">0.735</td><td class="num">0.91</td><td class="num">114.36</td><td class="num">0.719</td><td class="num">0.86</td><td class="num">−0.27</td><td class="num">−2.18</td><td class="num">−0.05</td></tr>
+        <tr><th scope="row">5</th><td class="num">150.70</td><td class="num">0.969</td><td class="num">0.91</td><td class="num">150.00</td><td class="num">0.957</td><td class="num">0.89</td><td class="num">−0.46</td><td class="num">−1.24</td><td class="num">−0.02</td></tr>
+        <tr><th scope="row">6</th><td class="num">179.56</td><td class="num">1.250</td><td class="num">0.92</td><td class="num">179.43</td><td class="num">1.170</td><td class="num">0.90</td><td class="num">−0.07</td><td class="num">−6.40</td><td class="num">−0.02</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">δ<sub>U</sub> = (U − U<sub>ref</sub>) / U<sub>ref</sub> × 100%，δ<sub>I</sub> 同理；ΔPF = PF − PF<sub>ref</sub>。U、I 为有效值，PF 的量纲为 1。所有偏差均为负值，表示本系统读数低于 PA1000。</p>
+
+  <figure id="fig-error">
+    <div class="diagram" style="padding:10px 8px 4px">
+      <svg viewBox="0 0 960 300" role="img" aria-labelledby="fig7-title fig7-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="fig7-title">6 组工况下的电压、电流与功率因数偏差</title>
+        <desc id="fig7-desc">三幅小图分别给出电压相对偏差、电流相对偏差与功率因数绝对偏差随工况的变化；所有偏差均为负值，电流偏差最大为 7.23%，电压最大为 0.46%，功率因数最大绝对偏差为 0.06。</desc>
+        <g font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+          <!-- panel a -->
+          <text x="58" y="28" font-size="11" font-weight="600" fill="#211f1a">（a）电压相对偏差 δU / %</text>
+          <line x1="58" y1="64" x2="258" y2="64" stroke="#b9b0a0" stroke-width="1"/>
+          <line x1="58" y1="114" x2="258" y2="114" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="58" y1="164" x2="258" y2="164" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="58" y1="214" x2="258" y2="214" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="58" y1="64" x2="58" y2="214" stroke="#cfc6b4" stroke-width="1"/>
+          <text x="50" y="67" text-anchor="end" font-size="9.5" fill="#948b7b">0</text>
+          <text x="50" y="117" text-anchor="end" font-size="9.5" fill="#948b7b">−0.2</text>
+          <text x="50" y="167" text-anchor="end" font-size="9.5" fill="#948b7b">−0.4</text>
+          <text x="50" y="217" text-anchor="end" font-size="9.5" fill="#948b7b">−0.6</text>
+          <rect x="67" y="64" width="18" height="57.5" fill="#2d4a5e"/>
+          <rect x="97" y="64" width="18" height="42.5" fill="#2d4a5e"/>
+          <rect x="127" y="64" width="18" height="45" fill="#2d4a5e"/>
+          <rect x="157" y="64" width="18" height="67.5" fill="#2d4a5e"/>
+          <rect x="187" y="64" width="18" height="115" fill="#2d4a5e"/>
+          <rect x="217" y="64" width="18" height="17.5" fill="#2d4a5e"/>
+          <text x="76" y="134.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.23</text>
+          <text x="106" y="119.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.17</text>
+          <text x="136" y="122" text-anchor="middle" font-size="9" fill="#4b473f">−0.18</text>
+          <text x="166" y="144.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.27</text>
+          <text x="196" y="192" text-anchor="middle" font-size="9" fill="#4b473f">−0.46</text>
+          <text x="226" y="94.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.07</text>
+          <text x="76" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">1</text>
+          <text x="106" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">2</text>
+          <text x="136" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">3</text>
+          <text x="166" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">4</text>
+          <text x="196" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">5</text>
+          <text x="226" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">6</text>
+
+          <!-- panel b -->
+          <text x="378" y="28" font-size="11" font-weight="600" fill="#211f1a">（b）电流相对偏差 δI / %</text>
+          <line x1="378" y1="64" x2="578" y2="64" stroke="#b9b0a0" stroke-width="1"/>
+          <line x1="378" y1="101.5" x2="578" y2="101.5" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="378" y1="139" x2="578" y2="139" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="378" y1="176.5" x2="578" y2="176.5" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="378" y1="214" x2="578" y2="214" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="378" y1="64" x2="378" y2="214" stroke="#cfc6b4" stroke-width="1"/>
+          <text x="370" y="67" text-anchor="end" font-size="9.5" fill="#948b7b">0</text>
+          <text x="370" y="104.5" text-anchor="end" font-size="9.5" fill="#948b7b">−2</text>
+          <text x="370" y="142" text-anchor="end" font-size="9.5" fill="#948b7b">−4</text>
+          <text x="370" y="179.5" text-anchor="end" font-size="9.5" fill="#948b7b">−6</text>
+          <text x="370" y="217" text-anchor="end" font-size="9.5" fill="#948b7b">−8</text>
+          <rect x="387" y="64" width="18" height="75.56" fill="#8a4b34"/>
+          <rect x="417" y="64" width="18" height="135.56" fill="#8a4b34"/>
+          <rect x="447" y="64" width="18" height="120.94" fill="#8a4b34"/>
+          <rect x="477" y="64" width="18" height="40.88" fill="#8a4b34"/>
+          <rect x="507" y="64" width="18" height="23.25" fill="#8a4b34"/>
+          <rect x="537" y="64" width="18" height="120" fill="#8a4b34"/>
+          <text x="396" y="152.6" text-anchor="middle" font-size="9" fill="#4b473f">−4.0</text>
+          <text x="426" y="212.6" text-anchor="middle" font-size="9" fill="#4b473f">−7.2</text>
+          <text x="456" y="198" text-anchor="middle" font-size="9" fill="#4b473f">−6.4</text>
+          <text x="486" y="117.9" text-anchor="middle" font-size="9" fill="#4b473f">−2.2</text>
+          <text x="516" y="100.3" text-anchor="middle" font-size="9" fill="#4b473f">−1.2</text>
+          <text x="546" y="197" text-anchor="middle" font-size="9" fill="#4b473f">−6.4</text>
+          <text x="396" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">1</text>
+          <text x="426" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">2</text>
+          <text x="456" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">3</text>
+          <text x="486" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">4</text>
+          <text x="516" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">5</text>
+          <text x="546" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">6</text>
+
+          <!-- panel c -->
+          <text x="698" y="28" font-size="11" font-weight="600" fill="#211f1a">（c）功率因数绝对偏差 ΔPF</text>
+          <line x1="698" y1="64" x2="898" y2="64" stroke="#b9b0a0" stroke-width="1"/>
+          <line x1="698" y1="101.5" x2="898" y2="101.5" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="698" y1="139" x2="898" y2="139" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="698" y1="176.5" x2="898" y2="176.5" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="698" y1="214" x2="898" y2="214" stroke="#e3ddce" stroke-width="1"/>
+          <line x1="698" y1="64" x2="698" y2="214" stroke="#cfc6b4" stroke-width="1"/>
+          <text x="690" y="67" text-anchor="end" font-size="9.5" fill="#948b7b">0</text>
+          <text x="690" y="104.5" text-anchor="end" font-size="9.5" fill="#948b7b">−0.02</text>
+          <text x="690" y="142" text-anchor="end" font-size="9.5" fill="#948b7b">−0.04</text>
+          <text x="690" y="179.5" text-anchor="end" font-size="9.5" fill="#948b7b">−0.06</text>
+          <text x="690" y="217" text-anchor="end" font-size="9.5" fill="#948b7b">−0.08</text>
+          <rect x="707" y="64" width="18" height="112.5" fill="#6f675a"/>
+          <rect x="737" y="64" width="18" height="93.75" fill="#6f675a"/>
+          <rect x="767" y="64" width="18" height="112.5" fill="#6f675a"/>
+          <rect x="797" y="64" width="18" height="93.75" fill="#6f675a"/>
+          <rect x="827" y="64" width="18" height="37.5" fill="#6f675a"/>
+          <rect x="857" y="64" width="18" height="37.5" fill="#6f675a"/>
+          <text x="716" y="189.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.06</text>
+          <text x="746" y="170.8" text-anchor="middle" font-size="9" fill="#4b473f">−0.05</text>
+          <text x="776" y="189.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.06</text>
+          <text x="806" y="170.8" text-anchor="middle" font-size="9" fill="#4b473f">−0.05</text>
+          <text x="836" y="114.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.02</text>
+          <text x="866" y="114.5" text-anchor="middle" font-size="9" fill="#4b473f">−0.02</text>
+          <text x="716" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">1</text>
+          <text x="746" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">2</text>
+          <text x="776" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">3</text>
+          <text x="806" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">4</text>
+          <text x="836" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">5</text>
+          <text x="866" y="234" text-anchor="middle" font-size="9.5" fill="#948b7b">6</text>
+
+          <text x="58" y="270" font-size="9" fill="#948b7b">横轴：工况编号（对应表 2）</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">图 7</span>6 组工况下的测量偏差。(a) 电压相对偏差；(b) 电流相对偏差；(c) 功率因数绝对偏差。柱高为负值表示本系统读数低于 PA1000。<span class="fig-en" lang="en">Fig. 7 Measurement deviations across six operating conditions.</span><span class="fig-note scroll-hint">窄屏可横向滑动查看完整图表。</span><span class="fig-note">偏差按表 2 定义；功率因数采用绝对差值 ΔPF，不与相对百分比混用。</span></figcaption>
+  </figure>
+
+  <p>电压通道 6 组相对偏差在 −0.46% 至 −0.07% 之间，最大 0.46%，平均 0.23%；电流通道在 −7.23% 至 −1.24% 之间，最大 7.23%，平均 4.59%；功率因数绝对偏差为 0.02–0.06，平均 0.04。所有偏差均为负，说明本系统读数系统性偏低。</p>
+  <p>电流偏差明显大于电压，且随工况变化不呈单调关系。一个可解释的来源是电流互感器二次波形中的谐波经二阶低通滤波后损失部分有效值分量；另一个来源是互感器变比、调理增益与通道标定的误差。现有数据不足以将两者分离，后续应通过逐通道注入标准信号，分别测量增益与相位误差。</p>
+  <p>功率因数由基波相位差计算，电流幅值偏差不直接进入 PF。因此 PF 的系统性偏低更可能来自相位补偿残差与滤波器相移，而不是电流幅值误差的叠加；这一点与“PF 误差随电流误差同向”的直觉不同，需要在后续的相位标定中验证。</p>
+  <p>电压通道的偏差较小且同样为负，说明前端增益存在约 0.1%–0.5% 的系统性偏低；这一量级在电阻、电容与互感器容差范围内，但未经标准源标定，不能据此给出修正系数。</p>
+
+  <figure id="fig-comparison">
+    <div class="plate">
+      <div class="panel">
+        <a href="assets/img/test-low1.jpg" target="_blank" rel="noopener" title="查看原图：低电流工况（一）">
+          <img src="assets/img/test-low1.jpg" alt="低电流工况：LCD 显示各相电压、电流与功率读数，右侧 PA1000 显示 Vrms 35.00 V、Arms 151.99 mA 等参数。" width="1100" height="825" decoding="async">
+        </a>
+        <span class="panel-no">(a)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/test-low2.jpg" target="_blank" rel="noopener" title="查看原图：低电流工况（二）">
+          <img src="assets/img/test-low2.jpg" alt="低电流工况另一组参数：LCD 与 PA1000 同屏显示，用于核对谐波与功率读数。" width="1100" height="825" decoding="async">
+        </a>
+        <span class="panel-no">(b)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/test-high1.jpg" target="_blank" rel="noopener" title="查看原图：高电流工况（一）">
+          <img src="assets/img/test-high1.jpg" alt="高电流工况：LCD 与 PA1000 同屏显示，用于核对电压、电流与功率读数。" width="1100" height="825" decoding="async">
+        </a>
+        <span class="panel-no">(c)</span>
+      </div>
+      <div class="panel">
+        <a href="assets/img/test-high2.jpg" target="_blank" rel="noopener" title="查看原图：高电流工况（二）">
+          <img src="assets/img/test-high2.jpg" alt="高电流工况另一组参数：LCD 与 PA1000 同屏显示，用于核对谐波与功率读数。" width="1100" height="825" decoding="async">
+        </a>
+        <span class="panel-no">(d)</span>
+      </div>
+    </div>
+    <figcaption><span class="fno">图 8</span>低电流与高电流工况下 LCD 与 PA1000 的同屏读数。(a)(b) 低电流工况；(c)(d) 高电流工况。照片用于核对显示项、接线与量程状态；其工况编号与表 2 的 6 组并非一一对应，具体数值以表 2 为准。<span class="fig-en" lang="en">Fig. 8 Side-by-side readings of the LCD and the PA1000 under low- and high-current conditions.</span></figcaption>
+  </figure>
+
+  <h3><span class="no">3.4</span>频率与谐波畸变率</h3>
+  <p>以实验室自制单相逆变电路为被测对象，改变调制波参数获得 3 组不同的电压 THD，PA1000 与本系统的读数见表 3。</p>
+
+  <div class="table-wrap" id="table3" role="region" tabindex="0" aria-label="表 3 频率与谐波畸变率，可横向滚动">
+    <table class="wide">
+      <caption><span class="tno">表 3</span>频率与电压谐波畸变率测量结果</caption>
+      <thead>
+        <tr>
+          <th scope="col">通道</th>
+          <th class="num" scope="col">PA1000 THD / %</th>
+          <th class="num" scope="col">本系统 THD / %</th>
+          <th class="num" scope="col">ΔTHD / pp</th>
+          <th class="num" scope="col">PA1000 f / Hz</th>
+          <th class="num" scope="col">本系统 f / Hz</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">A 相</th><td class="num">2.51</td><td class="num">2.74</td><td class="num">+0.23</td><td class="num">50</td><td class="num">50</td></tr>
+        <tr><th scope="row">B 相</th><td class="num">4.33</td><td class="num">4.45</td><td class="num">+0.12</td><td class="num">50</td><td class="num">50</td></tr>
+        <tr><th scope="row">C 相</th><td class="num">8.97</td><td class="num">9.01</td><td class="num">+0.04</td><td class="num">50</td><td class="num">50</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">pp 为百分点；ΔTHD = 本系统 − PA1000。三组频率读数均为 50 Hz；系统频率分辨率为 10 Hz（见 2.3 节），50 Hz 为峰值 bin 对应的读数。</p>
+
+  <p>三组 THD 的偏差为 +0.23、+0.12、+0.04 个百分点，均在 0.25 个百分点以内；频率读数均为 50 Hz，与基准一致。</p>
+  <p>这里需要区分“读数一致”与“频率测量精度”。本系统的频率由幅谱峰值 bin 反算，bin 宽 10 Hz；50 Hz 落在第 5 个 bin，因此读数只能是 10 Hz 的整数倍附近。该结果说明基波定位正确，但不能说明系统具备 0.01 Hz 量级的频率测量能力。LCD 显示 4 位小数（如 50.0000 Hz），显示位数高于实际分辨能力；更合理的显示方式是保留 1 位小数或直接显示频点序号。</p>
+  <p>THD 偏差为正（系统读数略高），且幅度较小。滤波器对 1 kHz 以上分量已有衰减，理论上会使高次谐波读数偏低；但 THD 由各次谐波共同决定，逆变源的谐波分布、FFT 泄漏与噪声也会影响结果。本文未保存 2–50 次谐波幅值，无法做分次比对，因此不对偏差方向作进一步归因。</p>
+  <p>分次谐波数据缺失是本次实验的一项限制；后续应保存各次谐波幅值与相位，以支持误差分解与滤波器幅频校正。</p>
+
+  <h3><span class="no">3.5</span>三相不平衡度</h3>
+  <p>以三个可调滑动变阻器作为三相负载：先将三相阻值调至相同，记录平衡状态；再改变一相或多相阻值，记录不平衡状态。电压、电流不平衡度按式 (6) 计算，结果见表 4。</p>
+
+  <div class="table-wrap" id="table4">
+    <table>
+      <caption><span class="tno">表 4</span>三相不平衡度测量结果</caption>
+      <thead>
+        <tr><th scope="col">负载状态</th><th class="num" scope="col">电压不平衡度 / %</th><th class="num" scope="col">电流不平衡度 / %</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">平衡</th><td class="num">0.00</td><td class="num">0.00</td></tr>
+        <tr><th scope="row">不平衡（工况一）</th><td class="num">0.94</td><td class="num">1.83</td></tr>
+        <tr><th scope="row">不平衡（工况二）</th><td class="num">0.93</td><td class="num">2.74</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">不平衡度按负序/正序基波有效值之比计算。本次测试未接入可读取不平衡度的参考仪器，表中数据用于一致性/趋势验证，不给出测量误差。</p>
+
+  <p>平衡状态下电压、电流不平衡度均为 0.00%，说明三相对称输入下算法没有引入固定偏置；不平衡状态下电压不平衡度为 0.93%–0.94%，电流不平衡度为 1.83%–2.74%，电流对负载不对称更敏感，与负序分量随负荷电流变化的预期一致。</p>
+  <p>本次测试未接入可读取不平衡度的参考仪器，PA1000 为单相功率分析仪，无法提供三相不平衡度基准。因此表 4 只能说明算法能够检出不平衡状态及其变化趋势，不能给出不平衡度的测量误差。这是本文结果解释的一项限制。</p>
+  <p>不平衡度只使用基波分量，零序分量未参与；在三相四线制不对称负载下，零序对电压不平衡的影响需另行评估。</p>
+</section>
+
+<section class="section" id="discussion">
+  <h2><span class="no">04</span>讨论<span class="en" lang="en">Discussion</span></h2>
+  <p>第 3 节的结果可以归纳为两点：单芯片方案能够完成稳态参数的测量；测量偏差与分辨率限制主要来自模拟前端、滤波器与 FFT 参数，而不是 ARM 的算力。以下分别讨论误差来源、适用边界与改进方向。</p>
+
+  <h3><span class="no">4.1</span>误差来源</h3>
+  <p><strong class="run">前端与滤波。</strong>电流通道的最大偏差 7.23%，明显大于电压通道的 0.46%。所有偏差为负，说明存在系统性尺度偏低。可能来源包括：互感器变比与调理增益的容差；二阶低通在 1 kHz 以上对电流谐波的衰减；通道间串扰与电源纹波。现有数据不足以分离这些因素。若要做计量级修正，需要逐通道、逐量程的增益与相位标定，而不是用一个统一的修正系数。</p>
+  <p><strong class="run">算法与分辨率。</strong>FFT 为 1024 点、矩形窗；实际帧长为 4.998 个工频周期，非严格整周期，存在频谱泄漏与栅栏效应。频率取峰值 bin，分辨率 10 Hz；THD 只统计 2–50 次谐波；PF 用基波相位差近似 <i>P</i>/<i>S</i>。对于稳态 50 Hz 信号，这些近似在本文的精度目标内可以接受，但限制了频率偏差、间谐波与暂态参数的测量能力。</p>
+  <p><strong class="run">参考与实验条件。</strong>PA1000 的读数作为基准，但未评定其不确定度；测试接线、环境温度与负载稳定性未在本文中记录；整机比对在单相回路上完成。表中偏差应理解为两台装置在当时的读数差异，而不是系统的计量误差限。照片中的工况与表 2 也不一一对应，这一点在引用数据时需要区分。</p>
+
+  <h3><span class="no">4.2</span>适用边界</h3>
+  <p>系统适用于 50 Hz 稳态、谐波次数不超过 50、负载变化缓慢的监测场景，例如教学实验平台、用电设备前端与工业供电回路的常规巡检。它不适用于变频场合、电压暂降/中断、闪变与暂态事件；频率读数不能用于频率偏差计量；电流通道未经逐通道标定，不宜作为计量器具使用。</p>
+  <p>在三相四线制系统中，零序分量与中性线电流未纳入本文的不平衡度计算；若用于四线制不对称负载监测，需要增加零序通道或修改算法。整机基本电参数也只在单相回路上完成比对，三相同时接入时的通道串扰与同步误差尚未评估。</p>
+
+  <h3><span class="no">4.3</span>改进方向</h3>
+  <ol class="numbered">
+    <li><strong class="run">硬件单板化。</strong>将六个模块整合为单板 PCB，缩短模拟走线，增加地平面与屏蔽，降低通道耦合与电源纹波；保留测试点，便于后续标定。</li>
+    <li><strong class="run">通道标定。</strong>用标准源逐通道注入电压、电流信号，测量增益与相位误差，建立修正系数；对电流通道重点标定，并覆盖不同量程与功率因数角。</li>
+    <li><strong class="run">滤波器校正。</strong>按实测幅频/相频响应做软件校正，或增加滤波阶数、调整 <i>Q</i> 值；在通带平坦度与高频衰减之间重新权衡，并用分次谐波数据验证。</li>
+    <li><strong class="run">频谱处理。</strong>FFT 前加 Hann 窗并采用插值校正，或用过零检测/锁相环获取基波频率；保存 2–50 次谐波幅值与相位，以支持误差分解。</li>
+    <li><strong class="run">量程与验证。</strong>根据信号幅值切换 ±2.56 V 量程，提高小信号分辨率；接入三相标准源与参考分析仪，建立不确定度预算，并评估三相同时采样时的串扰。</li>
+  </ol>
+</section>
+
+<section class="section" id="conclusion">
+  <h2><span class="no">05</span>结论<span class="en" lang="en">Conclusion</span></h2>
+  <p>本文设计并实现了一套基于 ARM 微控制器的三相电能计量系统，完成了 6 通道模拟前端、ADS8688 数据采集、1024 点 FFT 与参数计算，并以 PA1000 为参考进行了模块级与整机级测试。系统能够输出电压、电流有效值、有功/无功/视在功率、功率因数、频率、电压谐波畸变率与三相不平衡度。</p>
+  <p>在单相工频回路的 6 组工况中，电压最大相对偏差 0.46%，电流最大相对偏差 7.23%，功率因数最大绝对偏差 0.06；三档 THD 的偏差不超过 0.23 个百分点，频率读数与基准一致；平衡负载下不平衡度为 0.00%，不平衡负载下可检出变化。</p>
+  <p>结果表明，单芯片 ARM 方案可以完成稳态电能质量参数的测量，但电流通道的系统偏差、低 <i>Q</i> 值滤波器对高次谐波的衰减，以及 10 Hz 的频率分辨率，限制了其计量级应用。后续工作应围绕通道标定、滤波器幅频校正、加窗插值与三相标准源比对展开。</p>
+</section>
+
+<section class="section" id="refs">
+  <h2><span class="no">R</span>参考文献<span class="en" lang="en">References</span></h2>
+  <ol class="refs">
+    <li>常潇, 王金浩, 雷达, 等. 电能质量综合指标评价方法研究[J]. 电力电容器与无功补偿, 2021, 42(05): 150-153.</li>
+    <li>李建明. 电能质量控制与电力谐波治理[J]. 电源技术应用, 2010(11): 7.</li>
+    <li>李鹏飞. 基于 FPGA+ARM 的电能质量分析仪研究与设计[D]. 北方工业大学, 2023.<a class="ref-dl" href="assets/files/ref-03-li-pengfei-fpga-arm.pdf" download="ref-03-李鹏飞-基于FPGA+ARM的电能质量分析仪研究与设计.pdf">全文</a></li>
+    <li>GB 12325—1990, 电能质量 供电电压允许偏差[S].（现行版本为 GB/T 12325—2008《电能质量 供电电压偏差》）</li>
+    <li>GB/T 15945—2008, 电能质量 电力系统频率偏差[S].</li>
+    <li>GB/T 24337—2009, 电能质量 公用电网间谐波[S].</li>
+    <li>GB/T 15543—1995, 电能质量 三相电压允许不平衡度[S].（现行版本为 GB/T 15543—2008《电能质量 三相电压不平衡》）</li>
+    <li>黄文帅, 孙坚, 胡鹏程, 等. 配电网中三相不平衡度计算方法研究[J]. 信息技术与信息化, 2022(12): 174-177.</li>
+    <li>IEC Publication 61000-4-15. Flicker-functional and design specification[Z]. 1997.</li>
+    <li>Pei-Chen Lo, Yu-Yun Lee. Real-time FFT algorithm applied to on-line spectral analysis[J]. Circuits, Systems and Signal Processing, 1999(4): 377-393.</li>
+    <li>Heydt G T, Fjeld P S. Applications of the windowed FFT to electric power quality assessment[J]. IEEE Transactions on Power Delivery, 1999, 14(2): 1411-1416.</li>
+    <li>Rüfenacht A, Burroughs C J, Benz S P. Precision sampling measurements using ac programmable Josephson voltage standards[J]. Review of Scientific Instruments, 2008, 79(4): 794-800.</li>
+    <li>侯卫周, 谷城. 压控电压源二阶低通有源滤波电路设计与仿真[J]. 实验技术与管理, 2014, 31(10): 103-106.</li>
+    <li>单祥茹. TI 两款全新 ADC 功耗和性能达最优[J]. 中国电子商情(基础电子), 2014(12): 25-26.</li>
+    <li>Texas Instruments. FFT Library Module User's Guide[Z]. 2002.</li>
+    <li>詹一鸣. 基于 .NET 的电能质量监测与分析系统的设计[D]. 武汉纺织大学, 2018.</li>
+    <li>于军, 朱凌云. 基于 DSP+ARM 的便携式电能质量分析仪的设计[J]. 计算机测量与控制, 2015, 23(9): 3241-3244.<a class="ref-dl" href="assets/files/ref-04-yu-jun-dsp-arm.pdf" download="ref-04-于军-基于DSP+ARM的电能质量分析仪的研究与设计.pdf">全文</a></li>
+    <li>饶丽华. 基于 ARM 和 DSP 的电能质量监测仪的研究[D]. 同济大学, 2008.</li>
+    <li>刘锦霞. 基于 ARM+FPGA 的高精度电能质量分析系统研究[D]. 河南科技大学, 2019.</li>
+    <li>郝建民. 采样定理与奈奎斯特准则的研究[J]. 遥测遥控, 1998(2): 12-20.</li>
+  </ol>
+  <p class="note"><span class="note-label">版本说明</span>[4]、[7] 为设计报告引用时的标准版本，现行版本分别为 GB/T 12325—2008 与 GB/T 15543—2008。[3]、[17] 提供全文下载；其余文献未附全文，可通过期刊数据库或图书馆获取。</p>
+</section>
+
+<section class="section" id="appendix">
+  <h2><span class="no">A</span>资料与补充材料<span class="en" lang="en">Supplementary Material</span></h2>
+  <p>以下文件与页面数据来自同一设计报告与实测记录。PDF 已隐去作者与指导教师信息；文件位于本站 <code>assets/files/</code> 目录，可直接下载；链接使用 ASCII 文件名，下载时保留原始中文文件名。</p>
+
+  <div class="table-wrap" id="table5" role="region" tabindex="0" aria-label="表 5 补充材料清单，可横向滚动">
+    <table class="files-table">
+      <caption><span class="tno">表 5</span>补充材料清单（PDF）</caption>
+      <thead>
+        <tr>
+          <th scope="col">文件</th>
+          <th class="num" scope="col">页数</th>
+          <th class="num" scope="col">大小</th>
+          <th scope="col">下载</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="group"><th colspan="4">本项目文档</th></tr>
+        <tr>
+          <td><span class="fname">设计报告全文《基于 ARM 的三相电能计量系统设计》</span><span class="fpath">三相电能计量系统设计-毕业设计论文.pdf</span></td>
+          <td class="num">39</td><td class="num">1.75 MB</td>
+          <td><a class="dl" href="assets/files/thesis.pdf" download="三相电能计量系统设计-毕业设计论文.pdf" aria-label="下载设计报告全文">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">毕业设计材料册</span><span class="fpath">毕业设计材料册.pdf</span></td>
+          <td class="num">9</td><td class="num">0.44 MB</td>
+          <td><a class="dl" href="assets/files/materials.pdf" download="毕业设计材料册.pdf" aria-label="下载毕业设计材料册">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">答辩稿</span><span class="fpath">答辩逐字稿.pdf</span></td>
+          <td class="num">1</td><td class="num">0.18 MB</td>
+          <td><a class="dl" href="assets/files/defense-script.pdf" download="答辩逐字稿.pdf" aria-label="下载答辩稿">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+
+        <tr class="group"><th colspan="4">引用与延伸文献</th></tr>
+        <tr>
+          <td><span class="fname">参考文献 [3] · 李鹏飞</span><span class="fpath">ref-03-李鹏飞-基于FPGA+ARM的电能质量分析仪研究与设计.pdf</span></td>
+          <td class="num">67</td><td class="num">4.29 MB</td>
+          <td><a class="dl" href="assets/files/ref-03-li-pengfei-fpga-arm.pdf" download="ref-03-李鹏飞-基于FPGA+ARM的电能质量分析仪研究与设计.pdf" aria-label="下载参考文献 3">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">参考文献 [17] · 于军, 朱凌云</span><span class="fpath">ref-04-于军-基于DSP+ARM的电能质量分析仪的研究与设计.pdf</span></td>
+          <td class="num">100</td><td class="num">5.03 MB</td>
+          <td><a class="dl" href="assets/files/ref-04-yu-jun-dsp-arm.pdf" download="ref-04-于军-基于DSP+ARM的电能质量分析仪的研究与设计.pdf" aria-label="下载参考文献 17">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">延伸阅读 1 · 汶瑞建</span><span class="fpath">ref-01-汶瑞建-基于ARM的电能质量检测装置硬件系统设计与实现.pdf</span></td>
+          <td class="num">93</td><td class="num">17.98 MB</td>
+          <td><a class="dl" href="assets/files/ref-01-wen-ruijian-arm-hardware.pdf" download="ref-01-汶瑞建-基于ARM的电能质量检测装置硬件系统设计与实现.pdf" aria-label="下载延伸阅读 1">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">延伸阅读 2 · 栾小飞</span><span class="fpath">ref-02-栾小飞-基于ARM的电能质量监测仪系统软件的设计与实现.pdf</span></td>
+          <td class="num">85</td><td class="num">9.71 MB</td>
+          <td><a class="dl" href="assets/files/ref-02-luan-xiaofei-arm-software.pdf" download="ref-02-栾小飞-基于ARM的电能质量监测仪系统软件的设计与实现.pdf" aria-label="下载延伸阅读 2">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+        <tr>
+          <td><span class="fname">延伸阅读 3 · 龚建峰</span><span class="fpath">ref-05-龚建峰-基于DSP+CPLD的电能质量分析仪的研制.pdf</span></td>
+          <td class="num">69</td><td class="num">4.05 MB</td>
+          <td><a class="dl" href="assets/files/ref-05-gong-jianfeng-dsp-cpld.pdf" download="ref-05-龚建峰-基于DSP+CPLD的电能质量分析仪的研制.pdf" aria-label="下载延伸阅读 3">PDF <span class="arrow">↓</span></a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">页数与大小按当前文件统计；下载均为本地 PDF，不经过第三方服务。</p>
+
+  <div class="note"><span class="note-label">数据可用性</span>本文表格数据取自设计报告第 5 章与测试记录；本页未提供原始采样波形、逐次谐波幅值与仪器输出文件。硬件与软件参数见第 2 节；测试条件未完整记录，复现时需重新采集并重新标定。补充材料中的 PDF 为可公开文档。</div>
+  <div class="note"><span class="note-label">版权与匿名</span>页面与 PDF 中的作者、指导教师信息已隐去；引用文献的作者姓名属于文献著录信息，按原文保留。引用文献全文版权归原作者与出版单位所有，本页仅用于评审与答辩查阅。</div>
+</section>
+
+</main>
+
+</div>
+
+<footer class="site">
+  <div class="left">
+    <p>本页为静态研究展示页，数据取自设计报告与实测记录；页面不加载外部资源，不收集访问信息。作者与指导教师信息已隐去。</p>
+    <p>引用文献版权归原作者与出版单位所有，页面仅用于评审与答辩查阅。</p>
+  </div>
+  <div class="right">
+    <p>本科毕业设计 · 2024 年 5 月</p>
+    <p>页面版本 v2 · 2026 年 10 月</p>
+    <p><a href="index.html">资料首页</a> · <a href="index.html#downloads">下载资料</a></p>
+  </div>
+</footer>
+
+</div>
+
+<button id="to-top" type="button" aria-label="回到顶部" title="回到顶部">↑</button>
+<script defer src="heads/report.js"></script>
+</body>
+</html>

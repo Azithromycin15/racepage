@@ -1,0 +1,6 @@
+# 旧版单页地址（Cloudflare Workers 时期）
+/three-phase-energy-metering.html / 301
+/three-phase-energy-metering / 301
+
+# 统一使用目录首页，避免 /index.html 与 / 重复
+/index.html / 301
